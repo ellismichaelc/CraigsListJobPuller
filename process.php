@@ -38,17 +38,19 @@ foreach($all_sites as $key=>$site) {
 			
 			// Listing exists, update `updated` time
 			mysql_query("UPDATE `listings` SET `updated` = NOW() WHERE `url`='{$link}'");
-			
 			$updated++;
 			
 		} else {
 			
 			// Listing needs to be added
-			mysql_query("INSERT INTO `listings` VALUES('', '{$link}', NOW(), NOW(), -1, '{$text}');");
+			mysql_query("INSERT INTO `listings` VALUES('', '{$link}', NOW(), NOW(), -1, '{$text}', 0, NULL, NULL, NULL);");
 			
 			$added++;
 			
 		}
+		
+		$err = mysql_error();
+		if($err) die($err);
 	}
 }
 
@@ -60,7 +62,7 @@ $result = mysql_query("SELECT * FROM `listings` ORDER BY `status` ASC, `posted` 
 
 while($row = mysql_fetch_array($result)) {
 	// id, url, added, updated, posted, title, status, rate, attr, desc
-	
+
 	$url  = $row['url'];
 	$info = array();
 	
@@ -80,19 +82,19 @@ while($row = mysql_fetch_array($result)) {
 		if(!empty($info['title'])) {
 		
 			preg_match("/<div class=\"bigattr\">compensation: <b>(.*?)<\/b><\/div>/", $data, $matches);
-			$info['rate']   = trim($matches[1]);
+			if(!empty($matches[1])) $info['rate']   = trim($matches[1]);
 		
 			preg_match("/<time datetime=\"(.*?)\">.*?<\/time>/sm", $data, $matches);
-			$info['posted'] = trim($matches[1]);
+			if(!empty($matches[1])) $info['posted'] = trim($matches[1]);
 		
 			preg_match("/<section id=\"postingbody\">(.*?)<\/section>/sm", $data, $matches);
-			$info['desc']   = trim($matches[1]);
+			if(!empty($matches[1])) $info['desc']   = trim($matches[1]);
 		
 			preg_match("/<p class=\"attrgroup\">(.*?)<\/p>/sm", $data, $matches);
-			$info['attr']   = $matches[1];
+			if(!empty($matches[1])) $info['attr']   = $matches[1];
 			
 			preg_match_all("/<span>(.*?)<\/span>/sm", $info['attr'], $matches);
-			$info['attr']   = serialize($matches[1]);
+			if(!empty($matches[1])) $info['attr']   = serialize($matches[1]);
 			
 			$info['status'] = 1;
 			
@@ -114,13 +116,16 @@ while($row = mysql_fetch_array($result)) {
 	unset($dupe['status']);
 	
 	$sql = "UPDATE `listings` SET `status`=2 WHERE ";
-	foreach($dupe as $key=>$val) $sql .= (strstr($sql, '=\'') ? ',' : '') . " `{$key}`='" . mysql_real_escape_string($val) . "'";
+	foreach($dupe as $key=>$val) $sql .= (strstr($sql, '=\'') ? ' AND' : '') . " `{$key}`='" . mysql_real_escape_string($val) . "'";
 	
 	// Run duplicate query if this listing is valid
 	if($info['status'] == 1) {
-	
 		mysql_query($sql);
 		$dupes += mysql_affected_rows();
+
+		// Display errors
+		$err = mysql_error();
+		if($err) echo "<b>Error:</b> {$err}<br><b>Query:</b> {$sql}<br>";
 	
 	}
 	
@@ -132,18 +137,3 @@ while($row = mysql_fetch_array($result)) {
 	// Run update query
 	mysql_query($sql);
 	
-	if($info['status'] == 2) exit;
-	
-	// Display errors
-	$err = mysql_error();
-	if($err) echo "<b>Error:</b> {$err}<br><b>Query:</b> {$sql}<br>";
-}
-
-echo "$dupes duplicate rows removed, $added rows added, $updated rows updated, $parsed rows parsed, $failed rows failed to download or parse";
-?>
-
-
-
-
-
-
