@@ -15,47 +15,66 @@ $added     = 0;
 $updated   = 0;
 $parsed    = 0;
 $failed    = 0;
+$next      = 0;
+$dupes     = 0;
 
 $matcher   = preg_match_all("/href=\"(http.*?)\"/", $cl_sites, $matches);
 
 foreach($matches[1] as $match) $all_sites[] = $match;
-
+$all_sites = array("http://manila.en.craigslist.com.ph");
 foreach($all_sites as $key=>$site) {
 	$url  = $site . $search_url;
-	$data = file_get_contents($url) or die("Failed to download listings from {$site}");
-
-	$site_safe = preg_replace("/([\.\/])/", "\\\\$1", $site);
-	$matcher   = preg_match_all("/<a href=\"(\/[\/a-zA-Z0-9]*\/[0-9]+\.html)\">(.*?)<\/a>/", $data, $matches);
 	
-	for($i=0; $i<count($matches[1]); $i++) {
-		$link = $matches[1][$i];
-		$text = $matches[2][$i];
+	$urls = array($url);
+	$cur  = 0;
+	
+	while(isset($urls[$cur])) {
+		$url  = $urls[$cur];
+		$data = file_get_contents($url) or die("Failed to download listings from {$site}");
 		
-		$link = $site . $link;
-		$text = mysql_real_escape_string($text);
+		echo "scanning $url<br>";
 		
-		if(mysql_num_rows(mysql_query("SELECT * FROM `listings` WHERE `url`='{$link}' LIMIT 1")) > 0) {
+		$site_safe = preg_replace("/([\.\/])/", "\\\\$1", $site);
+		$matcher   = preg_match_all("/<a href=\"(\/[\/a-zA-Z0-9]*\/[0-9]+\.html)\">(.*?)<\/a>/", $data, $matches);
+	
+		for($i=0; $i<count($matches[1]); $i++) {
+			$link = $matches[1][$i];
+			$text = $matches[2][$i];
 			
-			// Listing exists, update `updated` time
-			mysql_query("UPDATE `listings` SET `updated` = NOW() WHERE `url`='{$link}'");
-			$updated++;
+			$link = $site . $link;
+			$text = mysql_real_escape_string($text);
 			
-		} else {
+			if(mysql_num_rows(mysql_query("SELECT * FROM `listings` WHERE `url`='{$link}' LIMIT 1")) > 0) {
+				
+				// Listing exists, update `updated` time
+				mysql_query("UPDATE `listings` SET `updated` = NOW() WHERE `url`='{$link}'");
+				$updated++;
+				
+			} else {
+				
+				// Listing needs to be added
+				mysql_query("INSERT INTO `listings` VALUES('', '{$link}', NOW(), NOW(), -1, '{$text}', 0, NULL, NULL, NULL);");
+				
+				$added++;
+				
+			}
 			
-			// Listing needs to be added
-			mysql_query("INSERT INTO `listings` VALUES('', '{$link}', NOW(), NOW(), -1, '{$text}', 0, NULL, NULL, NULL);");
-			
-			$added++;
-			
+			$err = mysql_error();
+			if($err) die($err);
 		}
 		
-		$err = mysql_error();
-		if($err) die($err);
+		preg_match("/href=\'(\/search\/.*?)\' class=\"button next\"/", $data, $matches);
+		if(isset($matches[1])) {
+		
+			$urls[] = $site . trim($matches[1]);
+			
+			$next++;
+		
+		}
+		
+		$cur++;
 	}
 }
-
-// Number of duplicates removed
-$dupes = 0;
 
 // Now loop through all the listings and parse them
 $result = mysql_query("SELECT * FROM `listings` ORDER BY `status` ASC, `posted` ASC");
@@ -115,25 +134,10 @@ while($row = mysql_fetch_array($result)) {
 	unset($dupe['posted']);
 	unset($dupe['status']);
 	
-	$sql = "UPDATE `listings` SET `status`=2 WHERE ";
-	foreach($dupe as $key=>$val) $sql .= (strstr($sql, '=\'') ? ' AND' : '') . " `{$key}`='" . mysql_real_escape_string($val) . "'";
+	$sql = "UPDATE `listings` SET `status`='2' WHERE `id` <> '{$row['id']}'";
+	foreach($dupe as $key=>$val) $sql .= " AND `{$key}`='" . mysql_real_escape_string($val) . "'";
 	
 	// Run duplicate query if this listing is valid
 	if($info['status'] == 1) {
 		mysql_query($sql);
-		$dupes += mysql_affected_rows();
-
-		// Display errors
-		$err = mysql_error();
-		if($err) echo "<b>Error:</b> {$err}<br><b>Query:</b> {$sql}<br>";
-	
-	}
-	
-	// Build update query
-	$sql = "UPDATE `listings` SET `updated`=NOW()";
-	foreach($info as $key=>$val) $sql .= ", `{$key}`='" . mysql_real_escape_string($val) . "'";
-	$sql .= " WHERE `id`='{$row['id']}'";
-	
-	// Run update query
-	mysql_query($sql);
-	
+		$dupes += mysql_affec
