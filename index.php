@@ -1,19 +1,11 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
  <head>
-  <title>CraigsList Jobs</title>
- </head>
- <body>
+  <title>CraigsList Telecommute Jobs</title>
+
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <script type="text/javascript" language="javascript" src="js/jquery-2.1.0.min.js"></script>
  
- <?
- require "lib/database.php";
- 
- $result = mysql_query("SELECT * FROM `listings` WHERE `status` = 1 ORDER BY `posted` DESC");
- while($row = mysql_fetch_array($result)) {
-	 
-	 echo "<a href=\"{$row['url']}\">" . $row['title'] . "</a><br>";
-	 
- }
- ?>
- 
- </body>
-</html>

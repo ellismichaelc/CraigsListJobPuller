@@ -21,7 +21,8 @@ $failed    = 0;
 $next      = 0;
 $dupes     = 0;
 
-$matcher   = preg_match_all("/href=\"(http.*?)\"/", $cl_sites, $matches);
+$matcher   = preg_match_all("/href=\"(http:.*?)\"/", $cl_sites, $matches);
+
 
 // Just some stuff for display in browser or in terminal
 if(isset($_SERVER['SERVER_SOFTWARE'])) $web = true;
@@ -144,4 +145,4 @@ while($row = mysql_fetch_array($result)) {
 			if(!empty($matches[1])) $info['posted'] = trim($matches[1]);
 		
 			preg_match("/<section id=\"postingbody\">(.*?)<\/section>/sm", $data, $matches);
-			if(!emp
+			if(!e
