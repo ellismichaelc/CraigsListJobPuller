@@ -23,7 +23,6 @@ $dupes     = 0;
 
 $matcher   = preg_match_all("/href=\"(http:.*?)\"/", $cl_sites, $matches);
 
-
 // Just some stuff for display in browser or in terminal
 if(isset($_SERVER['SERVER_SOFTWARE'])) $web = true;
 if($web) echo "<pre>";
@@ -101,7 +100,7 @@ foreach($all_sites as $key=>$site) {
 echo "** Starting listing parser!\n\n";
 
 // Now loop through all the listings and parse them
-$result = mysql_query("SELECT * FROM `listings` ORDER BY `status` ASC, `posted` ASC");
+$result = mysql_query("SELECT * FROM `listings` WHERE `status` < 2 ORDER BY `status` ASC,`posted` ASC");
 
 while($row = mysql_fetch_array($result)) {
 	// id, url, added, updated, posted, title, status, rate, attr, desc
@@ -143,6 +142,82 @@ while($row = mysql_fetch_array($result)) {
 		
 			preg_match("/<time datetime=\"(.*?)\">.*?<\/time>/sm", $data, $matches);
 			if(!empty($matches[1])) $info['posted'] = trim($matches[1]);
+			
+			if(!empty($info['posted'])) {
+
+				$info['posted'] = strtotime($info['posted']);				
+				$info['posted'] = date('Y-m-d H:i:s', $info['posted']);
+				
+			}
 		
 			preg_match("/<section id=\"postingbody\">(.*?)<\/section>/sm", $data, $matches);
-			if(!e
+			if(!empty($matches[1])) $info['desc']   = trim($matches[1]);
+		
+			preg_match("/<p class=\"attrgroup\">(.*?)<\/p>/sm", $data, $matches);
+			if(!empty($matches[1])) $info['attr']   = $matches[1];
+			
+			preg_match_all("/<span>(.*?)<\/span>/sm", $info['attr'], $matches);
+			if(!empty($matches[1])) $info['attr']   = serialize($matches[1]);
+			
+			$info['status'] = 1;
+			
+			$parsed++;
+			
+		} else {
+			
+			echo "\t-INVALID, BAD LISTING\n";
+			
+			$info['status'] = 2;
+			
+			$failed++;
+			
+		}
+	}
+	
+	// Remove duplicates first
+	$dupe = $info;
+	
+	unset($dupe['posted']);
+	unset($dupe['status']);
+	unset($dupe['location']);
+	
+	$sql = "UPDATE `listings` SET `status`='2' WHERE `id` <> '{$row['id']}'";
+	foreach($dupe as $key=>$val) $sql .= " AND `{$key}`='" . mysql_real_escape_string($val) . "'";
+	
+	// Run duplicate query if this listing is valid
+	if($info['status'] == 1) {
+		mysql_query($sql);
+		
+		$affected = mysql_affected_rows();
+		$dupes   += $affected;
+
+		// Display errors
+		$err = mysql_error();
+		if($err) echo "<b>Error:</b> {$err}<br><b>Query:</b> {$sql}<br>";
+	
+		if($affected > 0) echo "\t-DUPES: {$affected}\n";
+	}
+	
+	// Build update query
+	$sql = "UPDATE `listings` SET `updated`=NOW()";
+	foreach($info as $key=>$val) $sql .= ", `{$key}`='" . mysql_real_escape_string($val) . "'";
+	$sql .= " WHERE `id`='{$row['id']}'";
+	
+	// Run update query
+	mysql_query($sql);
+	
+	// Display errors
+	$err = mysql_error();
+	if($err) echo "<b>Error:</b> {$err}<br><b>Query:</b> {$sql}<br>";
+	
+	echo "\n";
+}
+
+echo "\n$dupes duplicate rows removed\n$added rows added\n$updated rows updated\n$parsed rows parsed\n$failed rows failed to download or parse\n$next next links followed";
+?>
+
+
+
+
+
+
