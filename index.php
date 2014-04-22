@@ -32,31 +32,6 @@
 	  overflow: auto;
   	}
 
-	/* Large desktops and laptops */
-	@media (min-width: 1200px) {
-
-	}
-	
-	/* Portrait tablets and medium desktops */
-	@media (min-width: 992px) and (max-width: 1199px) {
-
-	}
-	
-	/* Portrait tablets and small desktops */
-	@media (min-width: 768px) and (max-width: 991px) {
-
-	}
-	
-	/* Landscape phones and portrait tablets */
-	@media (max-width: 767px) {
-
-	}
-	
-	/* Landscape phones and smaller */
-	@media (max-width: 480px) {
-
-	}
-
 a.page-thumbnail {
   display: block;
   padding: 7px 7px 7px 11px;
@@ -105,6 +80,50 @@ a.page-thumbnail {
 		line-height: normal;
 	}
     
+    .te {
+	    word-break: break-all;
+    }
+
+	.modal-dialog {
+	  width: 60%; /* desired relative width */
+	  /*left: 20%; /* (100%-width)/2 */
+	  /* place center */
+	  margin-left:auto;
+	  margin-right:auto; 
+	}
+
+	/* Large desktops and laptops */
+	@media (min-width: 1200px) {
+
+	}
+	
+	/* Portrait tablets and medium desktops */
+	@media (min-width: 992px) and (max-width: 1199px) {
+
+	}
+	
+	/* Portrait tablets and small desktops */
+	@media (min-width: 768px) and (max-width: 991px) {
+
+	}
+	
+	/* Landscape phones and portrait tablets */
+	@media (max-width: 767px) {
+
+	}
+	
+	/* Landscape phones and smaller */
+	@media (max-width: 480px) {
+		.modal-title {
+			font-size: 12px;
+		}
+		
+		.modal-dialog {
+			width: 100%;
+			font-size: 10px;
+			margin-bottom: 30px;
+		}
+	}
   </style>
 
   <script>
@@ -114,69 +133,84 @@ a.page-thumbnail {
 		var page   = 1;
 		var xhr    = null;
 		var xhr2   = null;
-
+		var pages  = 0;
+		var count  = 0;
+		var results = 0;
+		var disable_scrollspy = false;
+		
 		$('#refresh').click(function() {
-			getData();
+			getData(false, true);
 		});
 		
 		$('#filter').on('input', function() {
 			filter = $('#filter').val();
-			getData();
+			page   = 1;
+			
+			getData(true, false, true);
+		});
+
+		$(window).scroll(function() {
+			if($(window).scrollTop() + $(window).height() > $(document).height() - $(window).height()) {
+				
+				if(!disable_scrollspy) {
+					disable_scrollspy = true;
+					
+					page = page + 1;
+					
+					getData(true);
+				}
+				
+			}
 		});
 		
-		function filterResults() {
+		function updateStatus() {
+			$('#data_status').fadeIn();
 			
-			/*
-			$('.job_row').each(function() {
-				
-				row   = $(this);
-				match = row.find("#title").html().toLowerCase().indexOf(filter.toLowerCase()) !== -1;
-				
-				if(!match) {
-					match = row.find("#location").html().toLowerCase().indexOf(filter.toLowerCase()) !== -1;
-				}
-				
-				if(match && counter < perpage) {
-					
-					// display row
-					row.fadeIn();
-					
-					counter++;
-					
-				} else {
-				
-					// dont display row
-					row.fadeOut();
-					
-				}
-				
-			});
-			*/
+			var output = "Displaying " + count + " of " + results + "";
+			
+			if(pages - page > 0) output = output + (pages > 1 ? ", " + (pages - page) + " more pages" : "");
+			
+			if(count == results) output = "Displaying " + count + " results";
+			
+			$('#results').html(output);
 		}
 	
-	    function getData(auto_refresh) {
+	    function getData(disallow_new_tags, is_auto, remove_old) {
 	    
 	    	// if auto refresh is true, it means the interval timer called the function
 	    	// therefore, the filter hasnt changed, and there were already results displayed
 	    	// so we should tag all new results with a 'new' tag or something snazzy if auto_refresh == true
 	    
+			// if append is set, should append results to the bottom instead of updating and removing ones not on the list
+	    
 	    	if(xhr) xhr.abort();
 	    	
 	    	$('.job_row').attr('data-state', 'pending');
-	    	if(!auto_refresh) $('.job_row').css('opacity', '.5');
+	    	if(remove_old) $('.job_row').css('opacity', '.5');
 	    
 	    	$('#status').html('Updating list..');
+			
+			page_num = is_auto ? 1 : page;
+			
+			if(page_num > 1) $('#data_loading').fadeIn();
 
-		    xhr = $.post("data.php", {filter: filter, page: page}, function(data) {
+		    xhr = $.post("data.php", {filter: filter, page: page_num}, function(data) {
 		    	updated = moment(data.last_update).unix();
 		    	now     = moment().unix();
+		    	updated = formatDuration(now - updated, false, " hour", " minute", false, " ", true, false, "just now", " ago", true, true);
 		    	
-			    $('#status').html('List Updated: ' + formatDuration(now - updated, false, " hour", " minute", false, " ", true, false, "just now", " ago", true, true));
+			    $('#status').html('List Updated: ' + updated);
+			    
+			    pages   = data.pages;
+			    results = data.total;
+			    count   = data.count;
+			    
+			    updateStatus();
 			    
 			    $(data.jobs).each(function(i, job) {
 					var row = updateRow(job);
 					
-					if(row.data('new') == true && auto_refresh && row.find('#new_label').length == 0) {
+					if(row.data('new') == true && !disallow_new_tags && row.find('#new_label').length == 0) {
 						$('<span id="new_label" class="label label-default">New</span>').css('margin-right', '5px').insertBefore(row.find('#title'));
 					}
 					
@@ -202,6 +236,7 @@ a.page-thumbnail {
 							dialog.modal();
 							
 							// Hook the blue button
+							dialog.find('.view-listing').unbind();
 							dialog.find('.view-listing').click(function() {
 								
 								window.open(job.url, "_blank", "");
@@ -222,10 +257,18 @@ a.page-thumbnail {
 					}
 			    });
 			    
-			    $('.job_row[data-state="pending"]').fadeOut(function() {
-			    	$(this).remove();
-			    });
+			    if(remove_old) {
+				    $('.job_row[data-state="pending"]').fadeOut(function() {
+				    	$(this).remove();
+				    });
+			    } else {
+				    $('.job_row[data-state="pending"]').css('opacity', 1);
+			    }
 			    
+			    if(page < pages) disable_scrollspy = false;
+			    
+			    $('#data_loading').fadeOut();
+				
 		    }, "json").fail(function() {
 				$('#status').html('Error while fetching data.');
 			});
@@ -355,8 +398,8 @@ a.page-thumbnail {
 		    return obj;
 		}
 	    
-	    setInterval(function(){ getData(true); }, 60000);
-	    getData();
+	    setInterval(function(){ getData(false, true); }, 60000);
+	    getData(true);
 	});
   </script>
  </head>
@@ -420,8 +463,19 @@ a.page-thumbnail {
 	        </a>
 		</div>
 		
+		<div id="data_status" style="display: none; margin-bottom: 20px;">
+			<h5 style="color: #666;">
+				<span class="glyphicon glyphicon-search" style="cursor: pointer; font-size: 13px;" id="refresh"></span>
+				<span id="results" style="margin-left: 5px; vertical-align: top;"></span>
+			</h5>
+		</div>
+		
 		<div id="data_content">
 		
+		</div>
+		
+		<div id="data_loading" style="display: none; margin-top: 25px;">
+			<h4>Grabbing next page..</h4>
 		</div>
 
 	</div>

@@ -3,12 +3,16 @@
 
 require "lib/database.php";
 
+$per_page = 25;
+$page     = isset($_POST['page']) ? $_POST['page'] : 1;
 $output   = array();
 $filter   = isset($_POST['filter']) ? $_POST['filter'] : "";
 $filter   = mysql_real_escape_string(trim(preg_replace("/[^\w\s\!\@\#\$\%\^\&\*\(\)\[\]\.\<\>\'\"]/", "", $filter)));
-$fltr_sql = !empty($filter) ? "AND `title` LIKE '%{$filter}%'" : "";
-
+$fltr_sql = !empty($filter) ? "AND (`title` LIKE '%{$filter}%' OR `location` LIKE '%{$filter}%')" : "";
 $details  = isset($_POST['details']) ? $_POST['details'] : "";
+
+if(!is_numeric($page) || $page < 1) $page = 1;
+
 if(is_numeric($details)) {
 	
 	// Requesting info about a specific listing
@@ -18,8 +22,15 @@ if(is_numeric($details)) {
 	$output['desc'] = utf8_encode($row['desc']);
 	
 } else {
+
+	$offset = ($page * $per_page) - $per_page;
+
+	$limit = " LIMIT {$offset},{$per_page}";
+	$query = "SELECT * FROM `listings` WHERE `status` = 1 {$fltr_sql} GROUP BY `title`, `attr` ORDER BY `posted` DESC";
 	
-	$result = mysql_query("SELECT * FROM `listings` WHERE `status` = 1 {$fltr_sql} GROUP BY `title`, `attr` ORDER BY `posted` DESC LIMIT 25");
+	$count = mysql_num_rows(mysql_query($query));
+	
+	$result = mysql_query($query . $limit);
 	while($row = mysql_fetch_array($result)) {
 	
 		$posted = $row['posted'];
@@ -43,6 +54,9 @@ if(is_numeric($details)) {
 	
 	}
 	
+	$output['total'] = $count;
+	$output['count'] = ($per_page * ($page - 1)) + @count($output['jobs']);
+	$output['pages'] = round(($count / $per_page) + .5);
 }
 
 echo json_encode($output);
