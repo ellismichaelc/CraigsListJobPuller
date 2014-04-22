@@ -89,6 +89,21 @@ a.page-thumbnail {
     display: inline;
     float: right;
     color: #AAAAAA; }
+
+	.modal-footer {
+		margin-top: 10px;
+		padding: 0px 10px 10px;
+		text-align: right;
+		border-top: 0;
+	}
+	
+	.modal-header {
+		padding: 8px;
+	}
+	
+	.modal-title {
+		line-height: normal;
+	}
     
   </style>
 
@@ -98,6 +113,7 @@ a.page-thumbnail {
 		var filter = "";
 		var page   = 1;
 		var xhr    = null;
+		var xhr2   = null;
 
 		$('#refresh').click(function() {
 			getData();
@@ -150,10 +166,8 @@ a.page-thumbnail {
 	    	if(!auto_refresh) $('.job_row').css('opacity', '.5');
 	    
 	    	$('#status').html('Updating list..');
-	    	
-	    	var post_data = {filter: filter, page: page};
 
-		    xhr = $.post("data.php", post_data, function(data) {
+		    xhr = $.post("data.php", {filter: filter, page: page}, function(data) {
 		    	updated = moment(data.last_update).unix();
 		    	now     = moment().unix();
 		    	
@@ -164,19 +178,51 @@ a.page-thumbnail {
 					
 					if(row.data('new') == true && auto_refresh && row.find('#new_label').length == 0) {
 						$('<span id="new_label" class="label label-default">New</span>').css('margin-right', '5px').insertBefore(row.find('#title'));
-
-						row.hover(function() {
+					}
+					
+					if(row.data('new') == true) {
+						row.click(function(e) {
+						
+							// Cancel previous description loader
+							if(xhr2) xhr2.abort();
 							
+							// Prevent opening the link
+							e.preventDefault();
+							
+							// Hide the 'new' label if they clicked
 							$(this).find('#new_label').fadeOut();
-							$(this).unbind();
 							
-							console.log("test");
+							// Job data
+							var job = $(this).data('job');
+							
+							// Load the dialog
+							var dialog = $('#listing_desc');
+							dialog.find(".modal-title").html(job.title);
+							dialog.find(".te").html("Loading..");
+							dialog.modal();
+							
+							// Hook the blue button
+							dialog.find('.view-listing').click(function() {
+								
+								window.open(job.url, "_blank", "");
+								
+							});
+
+							xhr2 = $.post("data.php", {details: job.id}, function(data) {
+							
+								dialog.find(".te").html(data.desc);
+								
+							}, "json").fail(function() {
+								
+								dialog.find(".te").html("Error: Couldn't load listing");
+								
+							});
 							
 						});
 					}
 			    });
 			    
-			    $('.job_row[data-state="pending"').fadeOut(function() {
+			    $('.job_row[data-state="pending"]').fadeOut(function() {
 			    	$(this).remove();
 			    });
 			    
@@ -309,7 +355,7 @@ a.page-thumbnail {
 		    return obj;
 		}
 	    
-	    setInterval(function(){ getData(true); }, 10000);
+	    setInterval(function(){ getData(true); }, 60000);
 	    getData();
 	});
   </script>
@@ -363,7 +409,7 @@ a.page-thumbnail {
 		</div>
 
 		<div id="data_template" style="display:none;">
-			<a href="" id="link" class="page-thumbnail">
+			<a href="" id="link" target="_blank" class="page-thumbnail">
 				<div class="title">
 					<span id="title"></span>
 					<div class="summary"><span id="location"></span></div>
@@ -379,6 +425,27 @@ a.page-thumbnail {
 		</div>
 
 	</div>
+
+	<!-- Listing Content Dialog -->
+	<div class="modal fade" id="listing_desc" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+	    <div class="modal-dialog">
+	        <div class="modal-content">
+	            <div class="modal-header">
+	                <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+	                 <h4 class="modal-title">Modal title</h4>
+	
+	            </div>
+	            <div class="modal-body"><div class="te"></div></div>
+	            <div class="modal-footer">
+	                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+	                <button type="button" class="btn btn-primary view-listing">View Listing</button>
+	            </div>
+	        </div>
+	        <!-- /.modal-content -->
+	    </div>
+	    <!-- /.modal-dialog -->
+	</div>
+	<!-- /.modal -->
  
  
  </body>
