@@ -307,7 +307,9 @@ a.page-thumbnail {
 							// Load the dialog
 							var dialog = $('#listing_desc');
 							dialog.find(".modal-title").html(job.title);
-							dialog.find(".te").html("Loading..");
+							dialog.find(".attr-label").remove();
+							dialog.find("#desc").remove();
+							dialog.find(".te").show().html("Loading..");
 							dialog.modal();
 							
 							// Hook the blue button
@@ -320,7 +322,35 @@ a.page-thumbnail {
 
 							xhr2 = $.post("data.php", {details: job.id}, function(data) {
 							
-								dialog.find(".te").html(data.desc);
+								dialog.find(".te").hide().clone().insertAfter(dialog.find(".te"))
+									.attr('id', 'desc')
+									.hide()
+									.html(data.desc)
+									.fadeIn();
+								
+								if(job.rate.length > 0) {
+									dialog.find('#desc').before(
+										$('<span id="attr_label" class="label label-success attr-label">Pay: ' + job.rate + '</span>')
+											.css('margin-right', '5px')
+											.fadeIn());
+								}
+								
+								
+								attr = 0;
+								$(job.attr).each(function(i, v) {
+									
+									if(v == null) return;
+
+									dialog.find('#desc').before(
+										$('<span id="attr_label" class="label label-primary attr-label">' + v + '</span>')
+											.css('margin-right', '5px')
+											.fadeIn());
+								
+									attr++;
+									
+								});
+								
+								if(attr > 0) dialog.find('.te').css('margin-top', '15px');
 								
 							}, "json").fail(function() {
 								

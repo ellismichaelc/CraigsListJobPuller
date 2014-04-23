@@ -51,11 +51,14 @@ if(is_numeric($details)) {
 		$row['title']    = utf8_encode($row['title']);
 		$row['location'] = utf8_encode($row['location']);
 		$row['desc']     = utf8_encode($row['desc']);
+		$row['rate']     = utf8_encode($row['rate']);
 		
 		$output['jobs'][] = array('id'       => $row['id'],
 								  'title'    => $row['title'],
 					              'url'      => $row['url'],
 					              'posted'   => $posted,
+					              'attr'     => @unserialize($row['attr']),
+					              'rate'     => $row['rate'],
 					              'location' => empty($row['location']) ? "" : "(" . $row['location'] . ")"
 					             );
 	
