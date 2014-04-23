@@ -10,6 +10,7 @@
   <script type="text/javascript" language="javascript" src="js/jquery-2.1.0.min.js"></script>
   <script type="text/javascript" language="javascript" src="js/bootstrap.min.js"></script>
   <script type="text/javascript" language="javascript" src="js/moment.min.js"></script>
+  <script type="text/javascript" language="javascript" src="js/jquery.cookie.js"></script>
   
   <style type="text/css" title="currentStyle">
 	@import "css/font.css";
@@ -91,6 +92,10 @@ a.page-thumbnail {
 	  margin-left:auto;
 	  margin-right:auto; 
 	}
+	
+	.page-header {
+		margin: 20px 0 20px;
+	}
 
 	/* Large desktops and laptops */
 	@media (min-width: 1200px) {
@@ -109,7 +114,27 @@ a.page-thumbnail {
 	
 	/* Landscape phones and portrait tablets */
 	@media (max-width: 767px) {
-
+		.modal-title {
+			font-size: 13px;
+		}
+		
+		.modal-dialog {
+			width: 90%;
+			font-size: 11px;
+			margin-bottom: 30px;
+		}
+		
+		.job_row #title {
+			font-size: 13px;
+		}
+		
+		.job_row #updated {
+			font-size: 11px;
+		}
+		
+		.status_filter #refresh, .status_filter #status, .status_filter #filter {
+			font-size: 13px !important;
+		}
 	}
 	
 	/* Landscape phones and smaller */
@@ -122,6 +147,22 @@ a.page-thumbnail {
 			width: 100%;
 			font-size: 10px;
 			margin-bottom: 30px;
+		}
+		
+		.job_row #title {
+			font-size: 12px;
+		}
+		
+		.job_row #updated {
+			font-size: 10px;
+		}
+		
+		.status_filter #refresh, .status_filter #status, .status_filter #filter, #results {
+			font-size: 12px !important;
+		}
+		
+		.status_filter #filter {
+			width: 100px;
 		}
 	}
   </style>
@@ -137,6 +178,9 @@ a.page-thumbnail {
 		var count  = 0;
 		var results = 0;
 		var disable_scrollspy = false;
+		var time   = 0;
+		
+		var scroll_timer;
 		
 		$('#refresh').click(function() {
 			getData(false, true);
@@ -150,23 +194,33 @@ a.page-thumbnail {
 		});
 
 		$(window).scroll(function() {
-			if($(window).scrollTop() + $(window).height() > $(document).height() - $(window).height()) {
+
+			  if(scroll_timer){
+			         clearTimeout(scroll_timer);  
+			  }
+			  
+			  scroll_timer = setTimeout(handleScroll, 50);
+		});
+		
+		function handleScroll() {
+			if(!pages > 1) return;
+		
+			if($(window).scrollTop() + $(window).height() > $(document).height() - 200) {
 				
+				// User is far down enough to load more results!
 				if(!disable_scrollspy) {
 					disable_scrollspy = true;
 					
-					page = page + 1;
-					
-					getData(true);
+					getData(true, false, false, true);
 				}
 				
-			}
-		});
+			}	
+		}
 		
 		function updateStatus() {
 			$('#data_status').fadeIn();
 			
-			var output = "Displaying " + count + " of " + results + "";
+			var output = "Displaying " + count + " of " + results + " results";
 			
 			if(pages - page > 0) output = output + (pages > 1 ? ", " + (pages - page) + " more pages" : "");
 			
@@ -175,7 +229,7 @@ a.page-thumbnail {
 			$('#results').html(output);
 		}
 	
-	    function getData(disallow_new_tags, is_auto, remove_old) {
+	    function getData(disallow_new_tags, is_auto, remove_old, next_page) {
 	    
 	    	// if auto refresh is true, it means the interval timer called the function
 	    	// therefore, the filter hasnt changed, and there were already results displayed
@@ -192,9 +246,25 @@ a.page-thumbnail {
 			
 			page_num = is_auto ? 1 : page;
 			
-			if(page_num > 1) $('#data_loading').fadeIn();
+			if(next_page) page_num++;
+			
+			if(page_num > 1 && pages > 1) {
+				$('#data_loading h4').html("Grabbing page " + page_num + " of " + pages + " ..");
+			
+				$('#data_loading').fadeIn();
+				
+				$('html, body').animate({
+			        scrollTop: $("#data_loading").offset().top
+			    }, 1000);
+			}
+			
+			var options = {filter: filter, page: page_num};
+			
+			if(is_auto) {
+				options['time'] = time;
+			}
 
-		    xhr = $.post("data.php", {filter: filter, page: page_num}, function(data) {
+		    xhr = $.post("data.php", options, function(data) {
 		    	updated = moment(data.last_update).unix();
 		    	now     = moment().unix();
 		    	updated = formatDuration(now - updated, false, " hour", " minute", false, " ", true, false, "just now", " ago", true, true);
@@ -203,11 +273,16 @@ a.page-thumbnail {
 			    
 			    pages   = data.pages;
 			    results = data.total;
-			    count   = data.count;
+			    //count   = data.count;
 			    
-			    updateStatus();
+			    if(!is_auto) {
+			    	time = data.time;
+			    	page = data.page;
+			    }
 			    
 			    $(data.jobs).each(function(i, job) {
+			    	count++;
+			    	
 					var row = updateRow(job);
 					
 					if(row.data('new') == true && !disallow_new_tags && row.find('#new_label').length == 0) {
@@ -258,19 +333,36 @@ a.page-thumbnail {
 			    });
 			    
 			    if(remove_old) {
+			    
 				    $('.job_row[data-state="pending"]').fadeOut(function() {
 				    	$(this).remove();
 				    });
+				    
 			    } else {
-				    $('.job_row[data-state="pending"]').css('opacity', 1);
+			    
+				    $('.job_row[data-state="pending"]').attr('data-state', 'complete').css('opacity', 1);
+				    
 			    }
 			    
 			    if(page < pages) disable_scrollspy = false;
 			    
 			    $('#data_loading').fadeOut();
+			    
+			    count = $('.job_row[data-state="complete"]').length;
+			    updateStatus();
 				
 		    }, "json").fail(function() {
+		    
 				$('#status').html('Error while fetching data.');
+				$('#data_loading h4').html($('#data_loading h4').html() + " Failed. Retrying..");
+				$('.job_row[data-state="pending"]').attr('data-state', 'complete').css('opacity', 1);
+				
+				setTimeout(function() {
+					disable_scrollspy = false;
+					handleScroll();
+				}, 1000);
+				
+				
 			});
 	    }
 	    
@@ -305,6 +397,8 @@ a.page-thumbnail {
 	    }
 	    
 	    function createRow(job) {
+	    	count++;
+	    
 	    	var jobs    = $('.job_row');
 	    	var new_row = $('#data_template').clone();
 	    	
@@ -421,10 +515,11 @@ a.page-thumbnail {
 			</div>
 			
 			<div class="navbar-collapse collapse">
+				<!--
 				<ul class="nav navbar-nav">
 					<li class="active"><a href="#">All Jobs</a></li>
 				</ul>
-          
+				-->
 
 			</div><!--/.navbar-collapse -->
 		</div>
@@ -432,9 +527,9 @@ a.page-thumbnail {
 	
 	<div class="container" role="main">
 		<div class="page-header">
-			<h1 id="#title">All Jobs</h1>
+			<!--<h1 id="#title">All Jobs</h1>-->
 					
-			<div style="display: block; overflow: auto;">
+			<div style="display: block; overflow: auto;" class="status_filter">
 				<div style="float:left;">
 	
 					<h5 style="color: #666;">
@@ -455,7 +550,7 @@ a.page-thumbnail {
 			<a href="" id="link" target="_blank" class="page-thumbnail">
 				<div class="title">
 					<span id="title"></span>
-					<div class="summary"><span id="location"></span></div>
+					<div class="summary"><span id="location" class="hidden-xs"></span></div>
 				</div>
 				
 				<div class="last-updated"><span id="updated"></span></div>
@@ -475,7 +570,7 @@ a.page-thumbnail {
 		</div>
 		
 		<div id="data_loading" style="display: none; margin-top: 25px;">
-			<h4>Grabbing next page..</h4>
+			<h4></h4>
 		</div>
 
 	</div>

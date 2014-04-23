@@ -5,6 +5,8 @@ require "lib/database.php";
 
 $per_page = 25;
 $page     = isset($_POST['page']) ? $_POST['page'] : 1;
+$time     = isset($_POST['time']) ? $_POST['time'] : 0;
+
 $output   = array();
 $filter   = isset($_POST['filter']) ? $_POST['filter'] : "";
 $filter   = mysql_real_escape_string(trim(preg_replace("/[^\w\s\!\@\#\$\%\^\&\*\(\)\[\]\.\<\>\'\"]/", "", $filter)));
@@ -26,11 +28,16 @@ if(is_numeric($details)) {
 	$offset = ($page * $per_page) - $per_page;
 
 	$limit = " LIMIT {$offset},{$per_page}";
-	$query = "SELECT * FROM `listings` WHERE `status` = 1 {$fltr_sql} GROUP BY `title`, `attr` ORDER BY `posted` DESC";
+	$query = "SELECT * FROM `listings` WHERE `status` = 1 %filter% GROUP BY `title`, `attr` ORDER BY `posted` DESC";
 	
-	$count = mysql_num_rows(mysql_query($query));
+	$count = mysql_num_rows(mysql_query(str_replace("%filter%", $fltr_sql, $query)));
 	
-	$result = mysql_query($query . $limit);
+	if($time > 0 && is_numeric($time)) {
+		$time      = date('Y-m-d H:i:s', $time);
+		$fltr_sql .= " AND `added` > '{$time}'";
+	}
+	
+	$result = mysql_query(str_replace("%filter%", $fltr_sql, $query) . $limit);
 	while($row = mysql_fetch_array($result)) {
 	
 		$posted = $row['posted'];
@@ -57,6 +64,8 @@ if(is_numeric($details)) {
 	$output['total'] = $count;
 	$output['count'] = ($per_page * ($page - 1)) + @count($output['jobs']);
 	$output['pages'] = round(($count / $per_page) + .5);
+	$output['time']  = time();
+	$output['page']  = $page;
 }
 
 echo json_encode($output);
