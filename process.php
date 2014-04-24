@@ -32,7 +32,7 @@ foreach($matches[1] as $match) $all_sites[] = $match;
 echo "Found: " . count($all_sites) . " CL sites to scrape\n\n";
 echo "** Starting site scraper to grab links!\n\n";
 
-foreach($all_sites as $key=>$site) {
+foreach($all_sites as $key=>$site) {break;
 	$url  = $site . $search_url;
 	
 	echo "Scanning: [" . ($key + 1) . "/" . count($all_sites) . "] {$site}\n";
@@ -110,6 +110,11 @@ while($row = mysql_fetch_array($result)) {
 	
 	$data = @file_get_contents($url);
 	
+	preg_match("/^(.*)\/.*\/(\d+)\.html/", $url, $matches);
+
+	$desc_url = $matches[1] . "/fb/" . $matches[2];
+	$desc     = @file_get_contents($desc_url);
+	
 	echo "{$url}\n";
 	
 	if(!$data) {
@@ -150,9 +155,18 @@ while($row = mysql_fetch_array($result)) {
 				
 			}
 		
-			preg_match("/<section id=\"postingbody\">(.*?)<\/section>/sm", $data, $matches);
-			if(!empty($matches[1])) $info['desc']   = trim($matches[1]);
-		
+			if(!empty($desc)) {
+			
+				$info['desc'] = trim($desc);
+				echo "\t-CLEAN DESC\n";
+				
+			} else {
+			
+				preg_match("/<section id=\"postingbody\">(.*?)<\/section>/sm", $data, $matches);
+				if(!empty($matches[1])) $info['desc']   = trim($matches[1]);
+				
+			}
+			
 			preg_match("/<p class=\"attrgroup\">(.*?)<\/p>/sm", $data, $matches);
 			if(!empty($matches[1])) $info['attr']   = $matches[1];
 			

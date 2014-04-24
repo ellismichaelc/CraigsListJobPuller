@@ -82,7 +82,7 @@ a.page-thumbnail {
 	}
     
     .te {
-	    word-break: break-all;
+	    word-break: break-word;
     }
 
 	.modal-dialog {
@@ -95,6 +95,11 @@ a.page-thumbnail {
 	
 	.page-header {
 		margin: 20px 0 20px;
+	}
+	
+	.attr-label {
+		display: inline-block !important;
+		white-space: normal !important;
 	}
 
 	/* Large desktops and laptops */
@@ -179,8 +184,10 @@ a.page-thumbnail {
 		var results = 0;
 		var disable_scrollspy = false;
 		var time   = 0;
-		
+		var cname  = "cljobs";
 		var scroll_timer;
+		var user_data = {};
+		var viewed    = [];
 		
 		$('#refresh').click(function() {
 			getData(false, true);
@@ -228,6 +235,7 @@ a.page-thumbnail {
 			
 			$('#results').html(output);
 		}
+		
 	
 	    function getData(disallow_new_tags, is_auto, remove_old, next_page) {
 	    
@@ -317,6 +325,7 @@ a.page-thumbnail {
 							dialog.find('.view-listing').click(function() {
 								
 								window.open(job.url, "_blank", "");
+								setJobProp(job, 'clicked');
 								
 							});
 
@@ -351,6 +360,8 @@ a.page-thumbnail {
 								});
 								
 								if(attr > 0) dialog.find('.te').css('margin-top', '15px');
+								
+								setJobProp(job, 'viewed');
 								
 							}, "json").fail(function() {
 								
@@ -420,6 +431,21 @@ a.page-thumbnail {
 			row.find("#link").attr('href', job.url);
 			row.css('opacity', 1);
 			row.attr('data-state', 'complete');
+			row.find(".glyphicon").remove();
+
+			if(getJobProp(job, 'viewed')) {
+			
+				var icon = "eye-close";
+			
+				if(getJobProp(job, 'clicked')) icon = "eye-open";
+			
+				$('<span id="link_icon" class="glyphicon glyphicon-' + icon + '"></span>')
+					.css('color', '#666')
+					.css('font-size', '90%')
+					.css('margin-right', '5px')
+					.insertBefore(row.find('#title'));
+			
+			}
 			
 			row.fadeIn();
 			
@@ -459,7 +485,48 @@ a.page-thumbnail {
 	    	
 			return new_row;
 	    }
-	    
+
+		function loadUserData() {
+			cookie_data = $.cookie(cname);
+			
+			if(!cookie_data) return;
+			
+			user_data   = JSON.parse(cookie_data);
+		}
+
+		function saveUserData(name, val) {
+			if(name) user_data[name] = val;
+			
+			$.cookie.json = true;
+			$.cookie(cname, user_data, { expires: 999 });
+		}
+		
+		function getUserData(name) {
+			if(!name) return user_data;
+			
+			return user_data[name];
+		}
+		
+		function setJobProp(job, prop, val) {
+			
+			if(!user_data[prop]) user_data[prop] = {};
+			
+			val = !val || val == undefined ? true : val;
+			user_data[prop][job.id] = val;
+			
+			saveUserData();
+			
+			updateRow(job);
+		 
+		}
+		
+		function getJobProp(job, prop) {
+			try {
+				if(user_data[prop][job.id] == undefined) return false;
+				return user_data[prop][job.id];
+			} catch(e) { return false; }
+		}
+		
 	    function updateSyncd() {
 			rows = $('[id^="data_user_"]');
 			
@@ -523,6 +590,8 @@ a.page-thumbnail {
 		}
 	    
 	    setInterval(function(){ getData(false, true); }, 60000);
+	    
+	    loadUserData();
 	    getData(true);
 	});
   </script>
