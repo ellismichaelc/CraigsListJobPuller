@@ -206,7 +206,86 @@ a.page-thumbnail {
 			         clearTimeout(scroll_timer);  
 			  }
 			  
-			  scroll_timer = setTimeout(handleScroll, 50);
+			  scroll_timer = setTimeout(handleScroll, 200);
+		});
+
+		$("#data_content").on("click", ".job_row", function(e) {
+		
+			// Cancel previous description loader
+			if(xhr2) xhr2.abort();
+			
+			// Prevent opening the link
+			e.preventDefault();
+			
+			// Hide the 'new' label if they clicked
+			$(this).find('#new_label').fadeOut();
+			
+			// Job data
+			var job = $(this).data('job');
+			
+			// Load the dialog
+			var dialog = $('#listing_desc');
+			dialog.find(".modal-title").html(job.title);
+			dialog.find(".attr-label").remove();
+			dialog.find("#desc").remove();
+			dialog.find(".te").show().html("Loading..");
+			dialog.modal();
+			
+			// Hook the blue button
+			dialog.find('.view-listing').unbind().click(function() {
+				
+				window.open(job.url, "_blank", "");
+				setJobProp(job, 'clicked');
+				
+			});
+
+			// Hook the green button
+			dialog.find('.applied').unbind().click(function() {
+				
+				setJobProp(job, 'applied');
+				
+			});
+
+			xhr2 = $.post("data.php", {details: job.id}, function(data) {
+			
+				dialog.find(".te").hide().clone().insertAfter(dialog.find(".te"))
+					.attr('id', 'desc')
+					.hide()
+					.html(data.desc)
+					.fadeIn();
+				
+				if(job.rate.length > 0) {
+					dialog.find('#desc').before(
+						$('<span id="attr_label" class="label label-success attr-label">Pay: ' + job.rate + '</span>')
+							.css('margin-right', '5px')
+							.fadeIn());
+				}
+				
+				
+				attr = 0;
+				$(job.attr).each(function(i, v) {
+					
+					if(v == null) return;
+
+					dialog.find('#desc').before(
+						$('<span id="attr_label" class="label label-primary attr-label">' + v + '</span>')
+							.css('margin-right', '5px')
+							.fadeIn());
+				
+					attr++;
+					
+				});
+				
+				if(attr > 0) dialog.find('.te').css('margin-top', '15px');
+				
+				setJobProp(job, 'viewed');
+				
+			}, "json").fail(function() {
+				
+				dialog.find(".te").html("Error: Couldn't load listing");
+				
+			});
+			
 		});
 		
 		function handleScroll() {
@@ -298,78 +377,7 @@ a.page-thumbnail {
 					}
 					
 					if(row.data('new') == true) {
-						row.click(function(e) {
-						
-							// Cancel previous description loader
-							if(xhr2) xhr2.abort();
-							
-							// Prevent opening the link
-							e.preventDefault();
-							
-							// Hide the 'new' label if they clicked
-							$(this).find('#new_label').fadeOut();
-							
-							// Job data
-							var job = $(this).data('job');
-							
-							// Load the dialog
-							var dialog = $('#listing_desc');
-							dialog.find(".modal-title").html(job.title);
-							dialog.find(".attr-label").remove();
-							dialog.find("#desc").remove();
-							dialog.find(".te").show().html("Loading..");
-							dialog.modal();
-							
-							// Hook the blue button
-							dialog.find('.view-listing').unbind();
-							dialog.find('.view-listing').click(function() {
-								
-								window.open(job.url, "_blank", "");
-								setJobProp(job, 'clicked');
-								
-							});
 
-							xhr2 = $.post("data.php", {details: job.id}, function(data) {
-							
-								dialog.find(".te").hide().clone().insertAfter(dialog.find(".te"))
-									.attr('id', 'desc')
-									.hide()
-									.html(data.desc)
-									.fadeIn();
-								
-								if(job.rate.length > 0) {
-									dialog.find('#desc').before(
-										$('<span id="attr_label" class="label label-success attr-label">Pay: ' + job.rate + '</span>')
-											.css('margin-right', '5px')
-											.fadeIn());
-								}
-								
-								
-								attr = 0;
-								$(job.attr).each(function(i, v) {
-									
-									if(v == null) return;
-
-									dialog.find('#desc').before(
-										$('<span id="attr_label" class="label label-primary attr-label">' + v + '</span>')
-											.css('margin-right', '5px')
-											.fadeIn());
-								
-									attr++;
-									
-								});
-								
-								if(attr > 0) dialog.find('.te').css('margin-top', '15px');
-								
-								setJobProp(job, 'viewed');
-								
-							}, "json").fail(function() {
-								
-								dialog.find(".te").html("Error: Couldn't load listing");
-								
-							});
-							
-						});
 					}
 			    });
 			    
@@ -433,19 +441,35 @@ a.page-thumbnail {
 			row.attr('data-state', 'complete');
 			row.find(".glyphicon").remove();
 
+			var icon    = "star";
+			var color   = "000";
+			var opacity = 0;
+		
 			if(getJobProp(job, 'viewed')) {
-			
-				var icon = "eye-close";
-			
-				if(getJobProp(job, 'clicked')) icon = "eye-open";
-			
-				$('<span id="link_icon" class="glyphicon glyphicon-' + icon + '"></span>')
-					.css('color', '#666')
-					.css('font-size', '90%')
-					.css('margin-right', '5px')
-					.insertBefore(row.find('#title'));
-			
+				icon    = "star-empty";
+				color   = "666";
+				opacity = 1;
 			}
+
+			if(getJobProp(job, 'clicked')) {
+				icon    = "star";
+				color   = "550000";
+				opacity = 1;
+			}
+			
+			if(getJobProp(job, 'applied')) {
+				icon    = "ok";
+				color   = "009900";
+				opacity = 1;
+			}
+		
+			$('<span id="link_icon" class="glyphicon glyphicon-' + icon + '"></span>')
+				.css('color', '#' + color)
+				.css('font-size', '90%')
+				.css('margin-right', '8px')
+				.css('opacity', opacity)
+				.insertBefore(row.find('#title'));
+			
 			
 			row.fadeIn();
 			
@@ -614,11 +638,10 @@ a.page-thumbnail {
 			</div>
 			
 			<div class="navbar-collapse collapse">
-				<!--
 				<ul class="nav navbar-nav">
-					<li class="active"><a href="#">All Jobs</a></li>
+					<li class="active"><a href="#jobs">Job List</a></li>
+					<li class=""><a href="#options">Options</a></li>
 				</ul>
-				-->
 
 			</div><!--/.navbar-collapse -->
 		</div>
@@ -685,7 +708,8 @@ a.page-thumbnail {
 	            </div>
 	            <div class="modal-body"><div class="te"></div></div>
 	            <div class="modal-footer">
-	                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+	            	<button type="button" class="btn btn-success applied" data-dismiss="modal" style="float: left;">I Applied</button>
+	                <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
 	                <button type="button" class="btn btn-primary view-listing">View Listing</button>
 	            </div>
 	        </div>

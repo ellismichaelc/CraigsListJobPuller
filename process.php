@@ -32,7 +32,7 @@ foreach($matches[1] as $match) $all_sites[] = $match;
 echo "Found: " . count($all_sites) . " CL sites to scrape\n\n";
 echo "** Starting site scraper to grab links!\n\n";
 
-foreach($all_sites as $key=>$site) {break;
+foreach($all_sites as $key=>$site) {
 	$url  = $site . $search_url;
 	
 	echo "Scanning: [" . ($key + 1) . "/" . count($all_sites) . "] {$site}\n";
