@@ -182,6 +182,7 @@ a.page-thumbnail {
 		var pages  = 0;
 		var count  = 0;
 		var results = 0;
+		var max_risk = 50;
 		var disable_scrollspy = false;
 		var time   = 0;
 		var cname  = "cljobs";
@@ -228,6 +229,7 @@ a.page-thumbnail {
 			dialog.find(".modal-title").html(job.title);
 			dialog.find(".attr-label").remove();
 			dialog.find("#desc").remove();
+			dialog.find('.alert').remove();
 			dialog.find(".te").show().html("Loading..");
 			dialog.modal();
 			
@@ -277,6 +279,14 @@ a.page-thumbnail {
 				});
 				
 				if(attr > 0) dialog.find('.te').css('margin-top', '15px');
+				
+				$(data.alert).each(function(i, v) {
+
+					dialog.find('.modal-body').prepend(
+						$('<div class="alert alert-' + v.type + '">' + v.msg + '</div>')
+							.fadeIn());
+
+				});
 				
 				setJobProp(job, 'viewed');
 				
@@ -389,7 +399,9 @@ a.page-thumbnail {
 				    
 			    } else {
 			    
-				    $('.job_row[data-state="pending"]').attr('data-state', 'complete').css('opacity', 1);
+				    $('.job_row[data-state="pending"]').each(function(i,v) {
+				    	$(this).attr('data-state', 'complete').css('opacity', $(this).data('opacity'));
+				    });
 				    
 			    }
 			    
@@ -431,15 +443,20 @@ a.page-thumbnail {
 	    	now    = moment().unix();
 	    	posted = formatDuration(now - job.posted, " day", " hour", " minute", false, " ", true, false, "just now", " ago", true, true);
 			
+			if(job.risk >= max_risk) row.data('opacity', '.5');
+			else			         row.data('opacity', 1);
+			
 			row.data('job', job);
 			row.data('new', !old);
 			row.find("#title").html(job.title);
 			row.find("#location").html(job.location);
 			row.find("#updated").html(posted);
 			row.find("#link").attr('href', job.url);
-			row.css('opacity', 1);
+			row.css('opacity', row.data('opacity'));
 			row.attr('data-state', 'complete');
 			row.find(".glyphicon").remove();
+			
+			
 
 			var icon    = "star";
 			var color   = "000";
