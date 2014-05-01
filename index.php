@@ -1,3 +1,57 @@
+<?
+require "lib/database.php";
+
+$user = false;
+$ref  = isset($_GET['ref']) ? mysql_real_escape_string($_GET['ref']) : "";
+
+if(!empty($ref)) {
+
+	$query  = "SELECT * FROM `sessions` WHERE `ref` = '{$ref}'";
+	$result = mysql_query($query);
+	$user   = mysql_fetch_array($result);
+	
+	// Restore the old session ID	
+	sess_id($user['ref']);
+	
+}
+
+if(!$user) {
+
+	$ses  = sess_id();
+	
+	$query  = "INSERT INTO `sessions` SET `ref` = '{$ses}', `first_access` = NOW(), `last_access` = NOW()";
+	$result = mysql_query($query);
+	
+}
+
+if($ref !== sess_id()) {
+	header('Location: ' . session_id());
+	exit;
+}
+
+function sess_id($id = false) {
+	// same as session_id() but will create a session if its not started
+	
+	if($id) {
+	
+		// we are setting
+		session_id($id);
+		
+		session_start();
+		
+	} else {
+		
+		if(session_id() == "") session_start();
+		
+		// we are getting
+		
+	}
+	
+	return session_id();
+	
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
  <head>
@@ -187,14 +241,18 @@ a.page-thumbnail {
 		var time   = 0;
 		var cname  = "cljobs";
 		var scroll_timer;
-		var user_data = {};
+		var data_timer;
 		var viewed    = [];
+		var last_update;
+		var last_run = 0;
+		var frequency = 60; // seconds to update
 		
 		$('#refresh').click(function() {
 			getData(false, true);
 		});
 		
 		$('#filter').on('input', function() {
+		
 			filter = $('#filter').val();
 			page   = 1;
 			
@@ -313,7 +371,7 @@ a.page-thumbnail {
 			}	
 		}
 		
-		function updateStatus() {
+		function updateResults() {
 			$('#data_status').fadeIn();
 			
 			var output = "Displaying " + count + " of " + results + " results";
@@ -325,6 +383,41 @@ a.page-thumbnail {
 			$('#results').html(output);
 		}
 		
+		function updateStatus(last_run_time) {
+	    	//updated = moment(last_update).unix();
+	    	
+	    	if(last_run_time == false) {
+				last_run = 0;
+	    	}
+	    	
+	    	if(!last_run_time == '') {
+	    		last_run = last_run_time;
+	    	}
+	    	
+	    	now     = moment().unix();
+	    	last    = now - last_run;
+	    	updated = formatDuration(last, false, " hour", " minute", " second", " ", true, false, "just now", " ago", true, true);
+
+	    	if(last > frequency && last_run > 0) {
+		    	getData(false, true);
+	    	}
+	    	
+	    	if(last_run == 0) {
+				
+				$('#status').html('Updating list..');
+				
+	    	
+	    	} else if (last_run == -1) {
+		    
+		    	// do nothing
+		    	
+	    	} else {
+	    	
+		    	$('#status').html('List Updated: ' + updated);
+		    	
+		    }
+		}
+		
 	
 	    function getData(disallow_new_tags, is_auto, remove_old, next_page) {
 	    
@@ -334,16 +427,18 @@ a.page-thumbnail {
 	    
 			// if append is set, should append results to the bottom instead of updating and removing ones not on the list
 	    
+			clearTimeout(data_timer);
+			
 	    	if(xhr) xhr.abort();
 	    	
 	    	$('.job_row').attr('data-state', 'pending');
 	    	if(remove_old) $('.job_row').css('opacity', '.5');
 	    
-	    	$('#status').html('Updating list..');
-			
+	    	
+			updateStatus(false);
 			page_num = is_auto ? 1 : page;
 			
-			if(next_page) page_num++;
+			if(next_page && pages > 1) page_num++;
 			
 			if(page_num > 1 && pages > 1) {
 				$('#data_loading h4').html("Grabbing page " + page_num + " of " + pages + " ..");
@@ -361,19 +456,16 @@ a.page-thumbnail {
 				options['time'] = time;
 			}
 
-		    xhr = $.post("data.php", options, function(data) {
-		    	updated = moment(data.last_update).unix();
-		    	now     = moment().unix();
-		    	updated = formatDuration(now - updated, false, " hour", " minute", false, " ", true, false, "just now", " ago", true, true);
-		    	
-			    $('#status').html('List Updated: ' + updated);
-			    
+		    xhr = $.post("data.php", options, function(data) {			    
 			    pages   = data.pages;
 			    results = data.total;
+			    last_update = data.last_update;
+			    
 			    //count   = data.count;
 			    
+			    time = data.time;
+			    
 			    if(!is_auto) {
-			    	time = data.time;
 			    	page = data.page;
 			    }
 			    
@@ -410,10 +502,19 @@ a.page-thumbnail {
 			    $('#data_loading').fadeOut();
 			    
 			    count = $('.job_row[data-state="complete"]').length;
-			    updateStatus();
+			    
+			    updateStatus(moment().unix());
+			    updateResults();
+			    //loadUserData();
+			    
+			    data_timer = setTimeout(function(){ getData(false, true); }, frequency * 1000);
 				
-		    }, "json").fail(function() {
+		    }, "json").fail(function(jqXHR, textStatus, errorThrown) {
 		    
+		    	if(errorThrown == 'abort') return;
+		    
+		    	updateStatus(-1);
+		    	
 				$('#status').html('Error while fetching data.');
 				$('#data_loading h4').html($('#data_loading h4').html() + " Failed. Retrying..");
 				$('.job_row[data-state="pending"]').attr('data-state', 'complete').css('opacity', 1);
@@ -423,7 +524,7 @@ a.page-thumbnail {
 					handleScroll();
 				}, 1000);
 				
-				
+				data_timer = setTimeout(function(){ getData(false, true); }, 3000);
 			});
 	    }
 	    
@@ -456,28 +557,34 @@ a.page-thumbnail {
 			row.attr('data-state', 'complete');
 			row.find(".glyphicon").remove();
 			
-			
-
 			var icon    = "star";
 			var color   = "000";
 			var opacity = 0;
 		
-			if(getJobProp(job, 'viewed')) {
+			if(job.props['viewed']) {
 				icon    = "star-empty";
 				color   = "666";
 				opacity = 1;
 			}
 
-			if(getJobProp(job, 'clicked')) {
+			if(job.props['clicked']) {
 				icon    = "star";
 				color   = "550000";
 				opacity = 1;
 			}
 			
-			if(getJobProp(job, 'applied')) {
+			if(job.props['applied']) {
 				icon    = "ok";
 				color   = "009900";
 				opacity = 1;
+			}
+
+			if(job.props['saving']) {
+				icon    = "floppy-open";
+				color   = "000000";
+				opacity = 0.6;
+				
+				delete job.props['saving'];
 			}
 		
 			$('<span id="link_icon" class="glyphicon glyphicon-' + icon + '"></span>')
@@ -528,18 +635,36 @@ a.page-thumbnail {
 	    }
 
 		function loadUserData() {
-			cookie_data = $.cookie(cname);
+			//cookie_data = $.cookie(cname);
 			
-			if(!cookie_data) return;
+			//if(!cookie_data) return;
 			
-			user_data   = JSON.parse(cookie_data);
+			if(data_loaded) return;
+
+		    $.post("data.php", {prop: 'get'}, function(data) {
+	
+				user_data   = data.user_data;
+				
+				data_loaded = true;
+				
+		    }, "json").fail(function() {
+		    
+				console.log("Failed");
+		
+			});
+			
+			
+			
+			//user_data   = JSON.parse(cookie_data);
 		}
 
 		function saveUserData(name, val) {
 			if(name) user_data[name] = val;
 			
+			/*
 			$.cookie.json = true;
-			$.cookie(cname, user_data, { expires: 999 });
+			$.cookie(cname, user_data, { expires: 999 });*/
+
 		}
 		
 		function getUserData(name) {
@@ -550,18 +675,34 @@ a.page-thumbnail {
 		
 		function setJobProp(job, prop, val) {
 			
-			if(!user_data[prop]) user_data[prop] = {};
+			//if(!user_data) user_data = {};
+			//if(!user_data[prop]) user_data[prop] = {};
 			
 			val = !val || val == undefined ? true : val;
-			user_data[prop][job.id] = val;
+			//user_data[prop][job.id] = val;
 			
-			saveUserData();
+			//saveUserData();
 			
+			if(job.props[prop]) return;
+			
+			job.props['saving'] = true;
 			updateRow(job);
+			
+		    $.post("data.php", {job: job.id, prop: prop, val: val}, function(data) {
+	
+				job.props[prop] = val;
+				
+				updateRow(job);
+				
+		    }, "json").fail(function() {
+		    
+				console.log("Failed");
+		
+			});
 		 
 		}
 		
-		function getJobProp(job, prop) {
+		function getJobProp(job, prop) {		
 			try {
 				if(user_data[prop][job.id] == undefined) return false;
 				return user_data[prop][job.id];
@@ -630,10 +771,10 @@ a.page-thumbnail {
 		    return obj;
 		}
 	    
-	    setInterval(function(){ getData(false, true); }, 60000);
-	    
-	    loadUserData();
 	    getData(true);
+	    updateStatus();
+	    
+	    setInterval(updateStatus, 1000);
 	});
   </script>
  </head>

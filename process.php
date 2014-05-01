@@ -181,6 +181,8 @@ while($row = mysql_fetch_array($result)) {
 			
 			echo "\t-INVALID, BAD LISTING\n";
 			
+			unset($info['title']);
+			
 			$info['status'] = 2;
 			
 			$failed++;

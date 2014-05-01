@@ -1,7 +1,7 @@
 <?
 //echo date("m/d/y h:ia T", strtotime("2014-04-17T21:13:21-0600"));
-
-require "lib/database.php";
+require "lib/database.php"; 
+session_start();
 
 $per_page = 25;
 $page     = isset($_POST['page']) ? $_POST['page'] : 1;
@@ -10,11 +10,65 @@ $time     = isset($_POST['time']) ? $_POST['time'] : 0;
 $output   = array();
 $search   = array("once every", "every", "on-site", "must live");
 $filter   = isset($_POST['filter']) ? $_POST['filter'] : "";
+$prop     = isset($_POST['prop']) ? $_POST['prop'] : "";
+$val      = isset($_POST['val']) ? $_POST['val'] : "";
+$job      = isset($_POST['job']) ? $_POST['job'] : "";
 $filter   = mysql_real_escape_string(trim(preg_replace("/[^\w\s\!\@\#\$\%\^\&\*\(\)\[\]\.\<\>\'\"]/", "", $filter)));
 $fltr_sql = !empty($filter) ? "AND (`title` LIKE '%{$filter}%' OR `location` LIKE '%{$filter}%' OR `desc` LIKE '%{$filter}%')" : "";
 $details  = isset($_POST['details']) ? $_POST['details'] : "";
+$props    = array("viewed", "clicked", "applied");
+$dont_list = false;
+
+$ses = session_id();
+$query = "SELECT * FROM `sessions` WHERE `ref` = '{$ses}'";
+$ses   = mysql_fetch_array(mysql_query($query));
+
+if(!isset($ses['id'])) die("Invalid session.");
+
+$ses_info = $ses;
+$ses      = $ses['id'];
 
 if(!is_numeric($page) || $page < 1) $page = 1;
+
+
+if(!empty($prop)) {
+
+	// Try to save this users settings!
+	
+	if(!empty($val) && !empty($job)) {
+	
+		if(!in_array($prop, $props)) die("That prop name isn't allowed.");
+		if(!is_numeric($job)) die("That's an invalid job.");
+	
+		$val = mysql_real_escape_string($val);
+		
+		$query = "SELECT * FROM `props` WHERE `session_id` = '{$ses}' AND `job_id` = '{$job}' AND `prop` = '{$prop}'";
+		if(mysql_num_rows(mysql_query($query)) > 0) {
+			
+			// UPDATE
+			$query = "UPDATE `props` SET %s WHERE `session_id` = '{$ses}' AND `job_id` = '{$job}' AND `prop` = '{$prop}'";
+			
+		} else {
+			
+			// INSERT
+			$query = "INSERT INTO `props` SET %s";
+			
+		}
+		
+		$params = "`session_id` = '{$ses}', `job_id` = '{$job}', `prop` = '{$prop}', `value` = '{$val}', `time` = NOW()";
+		$query  = sprintf($query, $params);
+		
+		mysql_query($query);
+		
+		if(mysql_affected_rows() > 0) $output['result'] = true;
+		else						  $output['result'] = false;
+		
+		$output['error'] = mysql_error();
+		$dont_list = true;
+	
+	}
+	
+}
 
 if(is_numeric($details)) {
 	
@@ -38,8 +92,11 @@ if(is_numeric($details)) {
 	elseif($risk >= 25)  $output['alert'][] = array("type" => "info",    "msg" => "<strong>Notice:</strong> Terms were detected in this ad that could indicate it to be fraudulent in some manner. Proceed with caution.");
 
 	$output['desc'] = utf8_encode($row['desc']);
+	$dont_list = true;
 	
-} else {
+}
+
+if(!$dont_list) {
 
 	$offset = ($page * $per_page) - $per_page;
 
@@ -49,10 +106,19 @@ if(is_numeric($details)) {
 	$count = mysql_num_rows(mysql_query(str_replace("%filter%", $fltr_sql, $query)));
 	
 	if($time > 0 && is_numeric($time)) {
-		$time      = date('Y-m-d H:i:s', $time);
-		$fltr_sql .= " AND `added` > '{$time}'";
-	}
 	
+		$time       = date('Y-m-d H:i:s', $time);
+		$updt_query = "SELECT * FROM `props` WHERE `session_id` = '{$ses}' AND `time` > '{$time}'";
+	
+		$output['msg'] = "FILTER USING {$time}!";
+	
+		if(mysql_num_rows(mysql_query($updt_query)) == 0 && !strtotime($ses_info['last_update']) > strtotime($time)) {
+			$fltr_sql .= " AND `added` > '{$time}'";
+		} else {
+			$output['msg'] = "NOT GONNA FILTER USING {$time}!";
+		}
+	}
+
 	$result = mysql_query(str_replace("%filter%", $fltr_sql, $query) . $limit);
 	while($row = mysql_fetch_array($result)) {
 	
@@ -80,6 +146,15 @@ if(is_numeric($details)) {
 		
 		//$row['title'] .= " ({$risk}%)";
 		
+		$props = array();
+		$query = "SELECT * FROM `props` WHERE `session_id` = '{$ses}' AND `job_id` = '{$row['id']}'";
+		$query = mysql_query($query);
+		while($prop_row = mysql_fetch_array($query)) {
+			
+			$props[ $prop_row['prop'] ] = $prop_row['value'];
+			
+		}
+		
 		$output['jobs'][] = array('id'       => $row['id'],
 								  'title'    => $row['title'],
 					              'url'      => $row['url'],
@@ -87,7 +162,8 @@ if(is_numeric($details)) {
 					              'attr'     => @unserialize($row['attr']),
 					              'rate'     => $row['rate'],
 					              'location' => empty($row['location']) ? "" : "(" . $row['location'] . ")",
-					              'risk'     => $risk
+					              'risk'     => $risk,
+					              'props'    => $props
 					             );
 	
 	}

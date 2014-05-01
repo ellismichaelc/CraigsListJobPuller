@@ -1,0 +1,6 @@
+RewriteEngine on
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+
+# Rewrite everything else through the pages parameter 
+RewriteRule ^([a-z0-9]+)$ /jobs/?ref=$1 [L] 
