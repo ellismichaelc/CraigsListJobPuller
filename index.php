@@ -120,18 +120,18 @@ a.page-thumbnail {
     float: right;
     color: #AAAAAA; }
 
-	.modal-footer {
+	#listing_desc .modal-footer{
 		margin-top: 10px;
 		padding: 0px 10px 10px;
 		text-align: right;
 		border-top: 0;
 	}
 	
-	.modal-header {
+	#listing_desc .modal-header {
 		padding: 8px;
 	}
 	
-	.modal-title {
+	#listing_desc .modal-title {
 		line-height: normal;
 	}
     
@@ -139,7 +139,7 @@ a.page-thumbnail {
 	    word-break: break-word;
     }
 
-	.modal-dialog {
+	#listing_desc .modal-dialog {
 	  width: 60%; /* desired relative width */
 	  /*left: 20%; /* (100%-width)/2 */
 	  /* place center */
@@ -154,6 +154,11 @@ a.page-thumbnail {
 	.attr-label {
 		display: inline-block !important;
 		white-space: normal !important;
+	}
+	
+	.nav .glyphicon {
+		font-size: 12px;
+		margin-right: 2px;
 	}
 
 	/* Large desktops and laptops */
@@ -173,18 +178,18 @@ a.page-thumbnail {
 	
 	/* Landscape phones and portrait tablets */
 	@media (max-width: 767px) {
-		.modal-title {
+		#listing_desc .modal-title {
 			font-size: 13px;
 		}
 		
-		.modal-dialog {
+		#listing_desc .modal-dialog {
 			width: 90%;
 			font-size: 11px;
 			margin-bottom: 30px;
 		}
 		
 		.job_row #title {
-			font-size: 13px;
+			font-size: 13px !important;
 		}
 		
 		.job_row #updated {
@@ -194,26 +199,31 @@ a.page-thumbnail {
 		.status_filter #refresh, .status_filter #status, .status_filter #filter {
 			font-size: 13px !important;
 		}
+		
+		#listing_desc .btn {
+			font-size: 12px !important;
+			padding: 6px !important;
+		}
 	}
 	
 	/* Landscape phones and smaller */
 	@media (max-width: 480px) {
-		.modal-title {
+		#listing_desc .modal-title {
 			font-size: 12px;
 		}
 		
-		.modal-dialog {
+		#listing_desc .modal-dialog {
 			width: 100%;
 			font-size: 10px;
 			margin-bottom: 30px;
 		}
 		
-		.job_row #title {
-			font-size: 12px;
+		.job_row #title, .job_row #link_icon {
+			font-size: 10px !important;
 		}
 		
 		.job_row #updated {
-			font-size: 10px;
+			font-size: 8px;
 		}
 		
 		.status_filter #refresh, .status_filter #status, .status_filter #filter, #results {
@@ -222,6 +232,24 @@ a.page-thumbnail {
 		
 		.status_filter #filter {
 			width: 100px;
+		}
+
+		#listing_desc .btn {
+			font-size: 9px !important;
+			padding: 4px !important;
+		}
+		
+		.job_row {
+			line-height: normal !important;//
+		}
+		
+		.job_row a#link {
+			padding: 0 !important;
+			margin: 0 !important;
+		}
+		
+		.job_row #link_icon {
+			margin-right: 2px !important;
 		}
 	}
   </style>
@@ -236,7 +264,7 @@ a.page-thumbnail {
 		var pages  = 0;
 		var count  = 0;
 		var results = 0;
-		var max_risk = 50;
+		var max_risk = 2;
 		var disable_scrollspy = false;
 		var time   = 0;
 		var cname  = "cljobs";
@@ -245,7 +273,10 @@ a.page-thumbnail {
 		var viewed    = [];
 		var last_update;
 		var last_run = 0;
+		var last_time = 0;
 		var frequency = 60; // seconds to update
+		var version;
+		var type_filter = "";
 		
 		$('#refresh').click(function() {
 			getData(false, true);
@@ -266,6 +297,21 @@ a.page-thumbnail {
 			  }
 			  
 			  scroll_timer = setTimeout(handleScroll, 200);
+		});
+		
+		$('.nav #menu_1 a').click(function() {
+			
+			var type = $(this).attr('data-type');
+			
+			if(type != 'undefined') {
+				type_filter = type;
+			} else {
+				type_filter = "";
+			}
+
+			page   = 1;
+			getData(true, false, true);
+			
 		});
 
 		$("#data_content").on("click", ".job_row", function(e) {
@@ -291,7 +337,7 @@ a.page-thumbnail {
 			dialog.find(".te").show().html("Loading..");
 			dialog.modal();
 			
-			// Hook the blue button
+			// Hook the view button
 			dialog.find('.view-listing').unbind().click(function() {
 				
 				window.open(job.url, "_blank", "");
@@ -299,10 +345,24 @@ a.page-thumbnail {
 				
 			});
 
-			// Hook the green button
-			dialog.find('.applied').unbind().click(function() {
-				
+			// Hook the applied button
+			dialog.find('.apply_applied').unbind().click(function() {
+
 				setJobProp(job, 'applied');
+				
+			});
+
+			// Hook the wont apply button
+			dialog.find('.apply_wont').unbind().click(function() {
+				
+				setJobProp(job, 'wont');
+				
+			});
+
+			// Hook the apply later button
+			dialog.find('.apply_later').unbind().click(function() {
+				
+				setJobProp(job, 'later');
 				
 			});
 
@@ -416,6 +476,21 @@ a.page-thumbnail {
 		    	$('#status').html('List Updated: ' + updated);
 		    	
 		    }
+		    
+		    if(now - last_time >= 60) {
+		    
+		    
+			    $('.job_row').each(function(i,v) {
+					
+					job = $(v).data("job");
+					
+					updateTime(job);
+					
+			    });
+			    
+			    last_time = now;
+		    
+		    }
 		}
 		
 	
@@ -450,7 +525,7 @@ a.page-thumbnail {
 			    }, 1000);
 			}
 			
-			var options = {filter: filter, page: page_num};
+			var options = {filter: filter, page: page_num, type: type_filter};
 			
 			if(is_auto) {
 				options['time'] = time;
@@ -461,7 +536,26 @@ a.page-thumbnail {
 			    results = data.total;
 			    last_update = data.last_update;
 			    
-			    //count   = data.count;
+				if(version) {
+					
+					if(version !== data.ver) {
+						
+						$('.modal').modal('hide');
+						dialog = $('.modal#page_updated').css('display','block');
+						margin = ($(window).height() - 200) / 2;
+						dialog.css('margin-top', margin + 'px').modal();
+						
+						setTimeout(function() {
+							
+							location.reload(); 
+							
+						}, 3500);
+						
+					}
+					
+				} else {
+					version = data.ver;
+				}
 			    
 			    time = data.time;
 			    
@@ -475,7 +569,7 @@ a.page-thumbnail {
 					var row = updateRow(job);
 					
 					if(row.data('new') == true && !disallow_new_tags && row.find('#new_label').length == 0) {
-						$('<span id="new_label" class="label label-default">New</span>').css('margin-right', '5px').insertBefore(row.find('#title'));
+						$('<span id="new_label" class="label label-success">New</span>').css('margin-right', '5px').insertBefore(row.find('#title'));
 					}
 					
 					if(row.data('new') == true) {
@@ -500,6 +594,49 @@ a.page-thumbnail {
 			    if(page < pages) disable_scrollspy = false;
 			    
 			    $('#data_loading').fadeOut();
+			    
+			    
+			    if(data.remove) {
+				    
+					$(data.remove).each(function(i, v) {
+					
+						$('#data_job_' + v).fadeOut(function() {
+				    		$(this).remove();
+						});
+						
+					});
+				    
+			    }
+
+			    if(data.props) {
+			    
+			    	$('.job_row').each(function(i, v) {
+				    	
+				    	job = $(v).data('job');
+				    	
+				    	job.props = {};
+				    	
+						updateRow(job);
+				    	
+			    	});
+				    
+					$(data.props).each(function(i, v) {
+					
+						// job_id, prop, val
+						
+						job = getJob(v.job_id);
+						
+						if(job) {
+							
+							job.props[v.prop] = v.val;
+							updateRow(job);
+							
+						}
+						
+					});
+				    
+			    }
+			    
 			    
 			    count = $('.job_row[data-state="complete"]').length;
 			    
@@ -532,6 +669,13 @@ a.page-thumbnail {
 		    $('#log').append(text + "<br>");
 	    }
 	    
+	    function updateTime(job) {
+	    	now    = moment().unix();
+	    	posted = formatDuration(now - job.posted, " day", " hour", " minute", false, " ", true, false, "just now", " ago", true, true);
+			
+			$('#data_job_' + job.id).find('#updated').html(posted);
+	    }
+	    
 	    function updateRow(job) {
 			var row = $('#data_job_' + job.id);
 			var old = true;
@@ -541,19 +685,17 @@ a.page-thumbnail {
 				old = false;
 			}
 			
-	    	now    = moment().unix();
-	    	posted = formatDuration(now - job.posted, " day", " hour", " minute", false, " ", true, false, "just now", " ago", true, true);
-			
 			if(job.risk >= max_risk) row.data('opacity', '.5');
 			else			         row.data('opacity', 1);
+			
+			updateTime(job);
 			
 			row.data('job', job);
 			row.data('new', !old);
 			row.find("#title").html(job.title);
 			row.find("#location").html(job.location);
-			row.find("#updated").html(posted);
 			row.find("#link").attr('href', job.url);
-			row.css('opacity', row.data('opacity'));
+			
 			row.attr('data-state', 'complete');
 			row.find(".glyphicon").remove();
 			
@@ -564,13 +706,27 @@ a.page-thumbnail {
 			if(job.props['viewed']) {
 				icon    = "star-empty";
 				color   = "666";
-				opacity = 1;
+				opacity = .6;
 			}
 
 			if(job.props['clicked']) {
 				icon    = "star";
 				color   = "550000";
-				opacity = 1;
+				opacity = .6;
+			}
+
+			if(job.props['wont']) {
+				icon    = "ban-circle";
+				color   = "990000";
+				opacity = 0;
+				
+				row.data('opacity', 0.5);
+			}
+
+			if(job.props['later']) {
+				icon    = "time";
+				color   = "E68A00";
+				opacity = .7;
 			}
 			
 			if(job.props['applied']) {
@@ -582,9 +738,18 @@ a.page-thumbnail {
 			if(job.props['saving']) {
 				icon    = "floppy-open";
 				color   = "000000";
-				opacity = 0.6;
+				opacity = 0.4;
 				
 				delete job.props['saving'];
+			}
+
+			if(job.props['failed']) {
+				icon    = "remove";
+				color   = "aa0000";
+				opacity = 0.6;
+				
+				
+				delete job.props['failed'];
 			}
 		
 			$('<span id="link_icon" class="glyphicon glyphicon-' + icon + '"></span>')
@@ -593,8 +758,8 @@ a.page-thumbnail {
 				.css('margin-right', '8px')
 				.css('opacity', opacity)
 				.insertBefore(row.find('#title'));
-			
-			
+				
+			row.css('opacity', row.data('opacity'));
 			row.fadeIn();
 			
 			return row;
@@ -632,6 +797,12 @@ a.page-thumbnail {
 	    	});
 	    	
 			return new_row;
+	    }
+	    
+	    function getJob(job_id) {
+		    
+		    return $('#data_job_' + job_id).data('job');
+		    
 	    }
 
 		function loadUserData() {
@@ -684,6 +855,15 @@ a.page-thumbnail {
 			//saveUserData();
 			
 			if(job.props[prop]) return;
+				
+			new_props = {};
+			
+			if(job.props['clicked']) new_props['clicked'] = true;
+			if(job.props['viewed'])  new_props['viewed'] = true;
+			
+			job.props = new_props;
+			
+			
 			
 			job.props['saving'] = true;
 			updateRow(job);
@@ -696,7 +876,9 @@ a.page-thumbnail {
 				
 		    }, "json").fail(function() {
 		    
-				console.log("Failed");
+				job.props['failed'] = true;
+				
+				updateRow(job);
 		
 			});
 		 
@@ -797,7 +979,19 @@ a.page-thumbnail {
 			
 			<div class="navbar-collapse collapse">
 				<ul class="nav navbar-nav">
-					<li class="active"><a href="#jobs">Job List</a></li>
+					<li class="dropdown">
+						<a href="#" class="dropdown-toggle" data-toggle="dropdown">Job List <b class="caret"></b></a>
+						<ul class="dropdown-menu" id="menu_1">
+							<li class=""><a href="#"><span class="glyphicon glyphicon-asterisk"></span> All Jobs</a></li>
+							<li class="divider"></li>
+							
+							<li><a href="#" data-type="later"><span class="glyphicon glyphicon-time"></span> Apply Later</a></li>
+							<li><a href="#" data-type="applied"><span class="glyphicon glyphicon-ok"></span> Applied To</a></li>
+							<li><a href="#" data-type="viewed"><span class="glyphicon glyphicon-star-empty"></span> Peeked At</a></li>
+							<li><a href="#" data-type="clicked"><span class="glyphicon glyphicon-star"></span> Viewed</a></li>
+							<li><a href="#" data-type="wont"><span class="glyphicon glyphicon-ban-circle"></span> Won't Apply</a></li>							
+						</ul>
+					</li>
 					<li class=""><a href="#options">Options</a></li>
 				</ul>
 
@@ -830,7 +1024,7 @@ a.page-thumbnail {
 			<a href="" id="link" target="_blank" class="page-thumbnail">
 				<div class="title">
 					<span id="title"></span>
-					<div class="summary"><span id="location" class="hidden-xs"></span></div>
+					<div class="summary" class="hidden-xs"><span id="location" class="hidden-xs"></span></div>
 				</div>
 				
 				<div class="last-updated"><span id="updated"></span></div>
@@ -866,8 +1060,10 @@ a.page-thumbnail {
 	            </div>
 	            <div class="modal-body"><div class="te"></div></div>
 	            <div class="modal-footer">
-	            	<button type="button" class="btn btn-success applied" data-dismiss="modal" style="float: left;">I Applied</button>
-	                <button type="button" class="btn btn-danger" data-dismiss="modal">Close</button>
+	            	<button type="button" class="btn btn-success apply_applied" data-dismiss="modal" style="float: left;">I Applied</button>
+	            	<button type="button" class="btn btn-warning apply_later" data-dismiss="modal" style="float: left;">Apply Later</button>
+	            	<button type="button" class="btn btn-danger apply_wont" data-dismiss="modal" style="float: left;">Won't Apply</button>
+	                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
 	                <button type="button" class="btn btn-primary view-listing">View Listing</button>
 	            </div>
 	        </div>
@@ -876,6 +1072,25 @@ a.page-thumbnail {
 	    <!-- /.modal-dialog -->
 	</div>
 	<!-- /.modal -->
+
+	<!-- Page Updated Dialog -->
+	<div class="modal fade" id="page_updated" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+	    <div class="modal-dialog modal-sm">
+	        <div class="modal-content">
+	            <div class="modal-body" style="text-align:center">
+	            	<div class="te">
+	            		<h4>This page has been updated!</h4>
+	            		.. loading the new version now ..
+	            	</div>
+	            </div>
+	        </div>
+	        <!-- /.modal-content -->
+	    </div>
+	    <!-- /.modal-dialog -->
+	</div>
+	<!-- /.modal -->
+
+
  
  
  </body>
