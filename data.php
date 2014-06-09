@@ -1,4 +1,15 @@
 <?
+
+/*
+
+plans:
+
+Convert this system to pass the displayed listing IDs 
+to this script. This way it can be determined which to
+send updates for.
+
+*/
+
 //echo date("m/d/y h:ia T", strtotime("2014-04-17T21:13:21-0600"));
 require "lib/database.php"; 
 session_start();
@@ -112,7 +123,7 @@ if(!$dont_list) {
 	$offset = ($page * $per_page) - $per_page;
 
 	$limit = " LIMIT {$offset},{$per_page}";
-	$query = "SELECT * FROM `listings` WHERE `status` = 1 %filter% GROUP BY `title`, `attr` ORDER BY `posted` DESC";
+	$query = "SELECT * FROM `listings` WHERE (`status` = 1) %filter% GROUP BY `title`, `attr` ORDER BY `posted` DESC";
 	
 	
 	
