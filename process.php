@@ -139,7 +139,7 @@ while(isset($proxy_urls[$cur])) {
 		} else {
 			
 			// Listing needs to be added
-			mysql_query("INSERT INTO `proxies` VALUES('', '{$ip}', '{$port}', '{$loc}', '{$speed}', '{$lag}', '{$proto}', '{$anon}', NOW(), NOW(), '', 1, 0, 0);");
+			mysql_query("INSERT INTO `proxies` VALUES('', '{$ip}', '{$port}', '{$loc}', '{$speed}', '{$lag}', '{$proto}', '{$anon}', NOW(), NOW(), '', '', 1, 0, 0);");
 			
 			$added++;
 			
@@ -405,6 +405,7 @@ function getURL($url = "", $config = array(), $proxy_url = false, $attempt = 0, 
 	global $proxy_start;
 	global $proxy_max_lag;
 	global $proxy_last_lag;
+	global $proxy_id;
 	
 	// TO PREVENT BEING BLOCKED BY CL
 	//sleep(3);
@@ -445,6 +446,8 @@ function getURL($url = "", $config = array(), $proxy_url = false, $attempt = 0, 
 	
 	$proxy_last_lag = $lag;
 	
+	$lag = round($lag, 2);
+	
 	if($test_run) echo "FINISHED IN {$lag} SECONDS.\n\n";
 	
 	if(!$result) {
@@ -466,6 +469,8 @@ function getURL($url = "", $config = array(), $proxy_url = false, $attempt = 0, 
 	if(preg_match("/This IP has been automatically blocked/", $result)) {
 		
 		// Craigslist has blocked us, lets use a new IP!
+		
+		mysql_query("UPDATE `proxies` SET `blocked` = NOW() WHERE `id` = {$proxy_id}");
 		
 		echo "\n+ SWITCHING PROXY DUE TO CL BLOCK.\n";
 		
@@ -569,7 +574,7 @@ function getProxyURL($force_new_proxy = false) {
 		
 	//}
 	
-	$result = mysql_query("SELECT *, (`speed` + `lag`) as `sp_lag` FROM `proxies` WHERE `alive` = 1 ORDER BY `used` ASC, sp_lag DESC, `uses` DESC, `failed` ASC LIMIT 1");
+	$result = mysql_query("SELECT *, (`speed` + `lag`) as `sp_lag` FROM `proxies` WHERE `alive` = 1 AND (`blocked` = 0 OR TIME_TO_SEC(TIMEDIFF(NOW(), `blocked`)) > (60*60)) ORDER BY sp_lag DESC, `uses` ASC, `failed` ASC, `used` ASC LIMIT 1");
 	$proxy  = mysql_fetch_array($result);
 	
 	mysql_query("UPDATE `proxies` SET `used` = NOW() WHERE `id` = {$proxy['id']}");
